@@ -284,6 +284,18 @@ namespace {
     return r;
   }
 
+  // This function should clean up container if it's std::string (meaning
+  // that it should trim it after first \0.
+  //
+  template <typename C>
+  void normalize_container(C &) {
+  }
+
+  template <>
+  void normalize_container<std::string>(std::string & container) {
+    container = container.c_str();
+  }
+
   /**
    * Try to read entry.length() values for this entry.
    *
@@ -327,6 +339,10 @@ namespace {
     for (size_t i = 0; i < entry.length(); ++i) {
       container[i] = parse<T, alignIntel>(data + sizeof(T) * i);
     }
+    // Needed because there can sometimes be trash after \0 in ASCII string
+    // probably left for alignment reasons. Pretty sure it's supposed to be
+    // ignored.
+    normalize_container(container);
     return true;
   }
 
