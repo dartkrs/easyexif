@@ -134,6 +134,7 @@ class EXIFInfo {
     double FocalLengthMax;          // Max focal length (mm)
     std::string Make;               // Lens manufacturer
     std::string Model;              // Lens model
+    std::string FromMakerNote;      // Extracted from MakerNote if supported
   } LensInfo;
 
 

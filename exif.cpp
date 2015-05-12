@@ -580,6 +580,7 @@ int EXIFInfo::parseFromEXIFSegment(const unsigned char *buf, unsigned len) {
   offs += 2;
   unsigned exif_sub_ifd_offset = len;
   unsigned gps_sub_ifd_offset  = len;
+  std::vector<unsigned char> maker_note;
   while (--num_entries >= 0) {
     IFEntry result = parseIFEntry(buf, offs, alignIntel, tiff_header_start, len);
     offs += 12;
@@ -723,6 +724,12 @@ int EXIFInfo::parseFromEXIFSegment(const unsigned char *buf, unsigned len) {
             this->MeteringMode = result.val_short().front();
           break;
 
+        case 0x927c:
+          if (result.format() == 7) {
+            maker_note.swap(result.val_byte());
+          }
+          break;
+
         case 0x9291:
           // Subsecond original time
           if (result.format() == 2)
@@ -770,6 +777,38 @@ int EXIFInfo::parseFromEXIFSegment(const unsigned char *buf, unsigned len) {
           break;
       }
       offs += 12;
+    }
+  }
+
+  if (!maker_note.empty()) {
+    std::string make;
+    make.resize(this->Make.size());
+    std::transform(begin(this->Make), end(this->Make), begin(make), ::tolower);
+    if (make == "canon") {
+      const unsigned char * make_buf = maker_note.data();
+      int num_entries = parse_value<uint16_t>(make_buf, true);
+      size_t off = 2;
+      while (--num_entries >= 0) {
+        if (off + 12 > maker_note.size()) {
+          break;
+        }
+        unsigned short tag, format;
+        unsigned int length, data;
+        parseIFEntryHeader(make_buf + off, alignIntel, tag, format, length, data);
+        IFEntry entry(tag, format, length, data);
+
+        switch (tag) {
+          case 0x0095:
+            if (format == 2) {
+              if(extract_values<uint8_t, true>(entry.val_string(), buf, tiff_header_start, len, entry)) {
+                this->LensInfo.FromMakerNote = entry.val_string();
+              }
+            }
+            break;
+        }
+
+        off += 12;
+      }
     }
   }
 
