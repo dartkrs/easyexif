@@ -950,4 +950,5 @@ void EXIFInfo::clear() {
   LensInfo.FStopMin = 0;
   LensInfo.Make = "";
   LensInfo.Model = "";
+  LensInfo.FromMakerNote = "";
 }
