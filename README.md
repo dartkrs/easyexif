@@ -1,3 +1,5 @@
+!! THIS BRANCH IS NOT TO BE MERGED OR PULL REQUESTED !!
+
 easyexif
 ========
 
