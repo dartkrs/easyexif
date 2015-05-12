@@ -65,6 +65,12 @@ namespace {
         length_(0),
         val_byte_(nullptr)
     {}
+    IFEntry(unsigned short ntag, unsigned short nformat, unsigned nlength, unsigned ndata) {
+      tag(ntag);
+      format(nformat);
+      length(nlength);
+      data(ndata);
+    }
     IFEntry(const IFEntry&) =delete;
     IFEntry & operator=(const IFEntry &) =delete;
     IFEntry(IFEntry && other)
