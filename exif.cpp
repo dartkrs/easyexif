@@ -166,6 +166,7 @@ namespace {
     void delete_union() {
       switch (format_) {
         case 0x1:
+        case 0x7:
           delete val_byte_;
           val_byte_ = nullptr;
           break;
@@ -196,6 +197,7 @@ namespace {
     void new_union() {
       switch (format_) {
         case 0x1:
+        case 0x7:
           val_byte_ = new byte_vector();
           break;
         case 0x2:
@@ -373,6 +375,7 @@ namespace {
     // Parse value in specified format
     switch (result.format()) {
       case 1:
+      case 7:
         if (!extract_values<uint8_t, alignIntel>(result.val_byte(), buf, base, len, result)) {
           result.tag(0xFF);
         }
@@ -403,7 +406,6 @@ namespace {
           result.tag(0xFF);
         }
         break;
-      case 7:
       case 9:
       case 10:
         break;
