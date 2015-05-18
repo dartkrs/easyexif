@@ -29,6 +29,7 @@
      EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 */
 #include "exif.h"
+#include "fmountlens4.h"
 
 #include <algorithm>
 #include <cstdint>
@@ -784,9 +785,11 @@ int EXIFInfo::parseFromEXIFSegment(const unsigned char *buf, unsigned len) {
     std::string make;
     make.resize(this->Make.size());
     std::transform(begin(this->Make), end(this->Make), begin(make), ::tolower);
+    // let's make tests based on make.. not failproof, but good enough (for now?)
     if (make == "canon") {
+      // canon format
       const unsigned char * make_buf = maker_note.data();
-      int num_entries = parse_value<uint16_t>(make_buf, true);
+      int num_entries = parse_value<uint16_t>(make_buf, alignIntel);
       size_t off = 2;
       while (--num_entries >= 0) {
         if (off + 12 > maker_note.size()) {
@@ -809,8 +812,130 @@ int EXIFInfo::parseFromEXIFSegment(const unsigned char *buf, unsigned len) {
 
         off += 12;
       }
+    } else if (make == "nikon corporation" || make == "nikon") {
+      const unsigned char * maker_buf = maker_note.data();
+      // some of nikon formats
+      const char * nikon0 = "Nikon\0";
+      if (maker_note.size() >= 6 && std::equal(nikon0, nikon0 + 6, begin(maker_note))) {
+        // nikon format 2 or 3
+        if (maker_note.size() >= 12 && maker_note[10] == maker_note[11] && (maker_note[10] == 'I' || maker_note[11] == 'M')) {
+          // nikon format 3
+          size_t off = 10;
+          if (off + 12 > maker_note.size()) {
+            goto end_of_maker_note;
+          }
+          // here would be nice to refactor actuall TIFF & IFD parsing code
+          // into separate functions, but I'm still waiting for upstream to
+          // merge my last PR, so don't want to really do that
+          // TL;DR: following code will not exactly follow DRY
+          bool alignIntel;
+          switch (maker_note[off]) {
+            case 'I':
+              alignIntel = true;
+              break;
+            case 'M':
+              alignIntel = false;
+              break;
+            default:
+              goto end_of_maker_note;
+          }
+          off += 2;
+          if (0x2a != parse_value<uint16_t>(maker_buf + off, alignIntel)) {
+            goto end_of_maker_note;
+          }
+          off += 2;
+          unsigned int first_ifd_offset = parse_value<uint32_t>(maker_buf + off, alignIntel);
+          off += first_ifd_offset - 4;
+          if (off + 2 > maker_note.size()) {
+            goto end_of_maker_note;
+          }
+          int num_entries = parse_value<uint16_t>(maker_buf + off, alignIntel);
+          if (off + 6 + 16 * num_entries > maker_note.size()) {
+            goto end_of_maker_note;
+          }
+          off += 2;
+          uint8_t lenstype = 0;
+          while (--num_entries >= 0) {
+            IFEntry result = parseIFEntry(maker_buf, off, alignIntel, 10, maker_note.size());
+            off += 12;
+
+            if (result.tag() == 0x0083) {
+              if (result.format() == 1) {
+                lenstype = result.val_byte()[0];
+              }
+            } else if (result.tag() == 0x0098) {
+              if (result.val_byte().size() < 4) {
+                goto end_of_maker_note;
+              }
+              auto & bytes = result.val_byte();
+              uint8_t lensId, fstop, minfocal, maxfocal, maxaperturemin, maxaperturemax, mcuversion;
+              if (bytes[0] == '0' && bytes[1] == '1' && bytes[2] == '0' && bytes[3] == '0') {
+                if (bytes.size() < 13) {
+                  goto end_of_maker_note;
+                }
+                lensId = bytes[6];
+                fstop = bytes[7];
+                minfocal = bytes[8];
+                maxfocal = bytes[9];
+                maxaperturemin = bytes[10];
+                maxaperturemax = bytes[11];
+                mcuversion = bytes[12];
+              } else if (bytes[0] == '0' && bytes[1] == '1' && bytes[2] == '0' && bytes[3] == '1') {
+                if (bytes.size() < 19) {
+                  goto end_of_maker_note;
+                }
+                lensId = bytes[11];
+                fstop = bytes[12];
+                minfocal = bytes[13];
+                maxfocal = bytes[14];
+                maxaperturemin = bytes[15];
+                maxaperturemax = bytes[16];
+                mcuversion = bytes[17];
+              } else {
+                // unsupported version
+                goto end_of_maker_note;
+              }
+              std::vector<string> possible_lenses;
+              for (auto r : fmountlens) {
+                if (r.lid == lensId
+                    &&
+                    r.stps == fstop
+                    &&
+                    r.focs == minfocal
+                    &&
+                    r.focl == maxfocal
+                    &&
+                    r.aps == maxaperturemin
+                    &&
+                    r.apl == maxaperturemax
+                    &&
+                    r.lfw == mcuversion
+                    &&
+                    r.ltype == lenstype
+                ) {
+                  possible_lenses.push_back(string(r.manuf).append(" ").append(r.lensname));
+                }
+              }
+              if (possible_lenses.empty()) {
+                this->LensInfo.FromMakerNote = "Not in the database.";
+              } else {
+                auto it = begin(possible_lenses);
+                this->LensInfo.FromMakerNote = *(it++);
+                for ( ; it != end(possible_lenses); ++it) {
+                  this->LensInfo.FromMakerNote.append(" or ").append(*it);
+                }
+              }
+            }
+          }
+        } else {
+          // nikon format 2
+        }
+      } else {
+        // nikon format 1
+      }
     }
   }
+end_of_maker_note:
 
   // Jump to the GPS SubIFD if it exists and parse all the information
   // there. Note that it's possible that the GPS SubIFD doesn't exist.

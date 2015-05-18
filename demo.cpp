@@ -75,6 +75,7 @@ int main(int argc, char *argv[]) {
   printf("Lens f-stop max      : f/%.1f\n", result.LensInfo.FStopMax);
   printf("Lens make            : %s\n", result.LensInfo.Make.c_str());
   printf("Lens model           : %s\n", result.LensInfo.Model.c_str());
+  printf("Lens from maker note : %s\n", result.LensInfo.FromMakerNote.c_str());
 
   return 0;
 }
