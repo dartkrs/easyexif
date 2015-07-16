@@ -56,6 +56,7 @@
 #define __EXIF_H
 
 #include <string>
+#include <stdint.h>
 
 // 
 // Class responsible for storing and parsing EXIF information from a JPEG blob
@@ -79,6 +80,9 @@ class EXIFInfo {
   // Set all data members to default values.
   void clear();
 
+  // Nikon Makernote decryption
+  void nikon_decrypt(unsigned char *buf, unsigned len, uint32_t count, uint32_t serial);
+
   // Data fields filled out by parseFrom()
   char ByteAlign;                   // 0 = Motorola byte alignment, 1 = Intel 
   std::string ImageDescription;     // Image description
@@ -98,6 +102,9 @@ class EXIFInfo {
   std::string DateTimeDigitized;    // Digitization date and time (may not exist)
   std::string SubSecTimeOriginal;   // Sub-second time that original picture was taken
   std::string Copyright;            // File copyright information
+  std::string Comment;				// User comment
+  std::string SerialNumber;			// Camera serial number
+
   double ExposureTime;              // Exposure time in seconds
   double FNumber;                   // F/stop
   unsigned short ISOSpeedRatings;   // ISO speed
@@ -115,6 +122,7 @@ class EXIFInfo {
                                     // 5: multi-segment
   unsigned ImageWidth;              // Image width reported in EXIF data
   unsigned ImageHeight;             // Image height reported in EXIF data
+
   struct Geolocation_t {            // GPS information embedded in file
     double Latitude;                  // Image latitude expressed as decimal
     double Longitude;                 // Image longitude expressed as decimal
@@ -127,6 +135,7 @@ class EXIFInfo {
       char direction;
     } LatComponents, LonComponents;   // Latitude, Longitude expressed in deg/min/sec 
   } GeoLocation;
+
   struct LensInfo_t {               // Lens information
     double FStopMin;                // Min aperture (f-stop)
     double FStopMax;                // Max aperture (f-stop)
@@ -134,6 +143,8 @@ class EXIFInfo {
     double FocalLengthMax;          // Max focal length (mm)
     std::string Make;               // Lens manufacturer
     std::string Model;              // Lens model
+	std::string SerialNumber;		// Lens serial number
+    std::string FromMakerNote;      // Extracted from MakerNote if supported
   } LensInfo;
 
 
